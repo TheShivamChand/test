@@ -2,14 +2,24 @@ from  flask import Flask,jsonify,request,Response
 import json
 #from settings import *
 from pymongo import MongoClient
+import jwt
+import datetime
 
 app=Flask(__name__)
+
+app.config['SECRET_KEY']= 'r2d2'
+
+@app.route('/login')
+def get_token():
+	expirationDate= datetime.datetime.utcnow()+datetime.timedelta(seconds=100)
+	token= jwt.encode({'exp':expirationDate}, app.config['SECRET_KEY'],algorithm='HS256')
+	return token
 
 '''
 books=[
 {
-	"name":"A",
-	"price":3.25,
+	"name":"A"
+,	"price":3.25,
 	"isbn":1
 },
 {
@@ -45,27 +55,37 @@ def validBookObject(bookObject):
 	else:
 		return False
 
-@app.route('/')
+@app.route('/home')
 def hello_world():
+	token=request.args.get('token')
+	try:
+		jwt.decode(token,app.config['SECRET_KEY'])
+	except:
+		return jsonify({'error':'enter a valid token'}), 401
+
 	return 'Hello'
 
 @app.route('/books')
 def get_books():
+	token= request.args.get('token')
 	try:
-		conn=MongoClient()
-		print("Connected Successfully")
+		jwt.decode(token,app.config['SECRET_KEY'])
+		try:
+			conn=MongoClient()
+		except:
+			print("Could not connect to database")
+		db=conn.database
+		collection=db.test
+		cursor=collection.find().sort("isbn")
+
+		lists=[]
+
+		for record in cursor:
+			lists.append({'name':record['name'],'price':record['price'],'isbn':record['isbn']})
 	except:
-		print("Could not connect to database")
-	db=conn.database
-	collection=db.test
-	cursor=collection.find().sort("isbn")
+		return jsonify({'error':'Enter a valid token'}),401
 
-	lists=[]
-
-	for record in cursor:
-		lists.append({'name':record['name'],'price':record['price'],'isbn':record['isbn']})
-
-	return jsonify({'result':lists})
+	return jsonify({'books:':lists})
 
 @app.route('/add_books',methods=['POST'])
 def add_books():
@@ -99,29 +119,48 @@ def add_books():
 
 @app.route('/books/<int:isbn>')
 def get_books_by_isbn(isbn):
-	return_value={}
+	try:
+		conn=MongoClient()
+	except:
+		print("Could not connect")
+	db=conn.database
+	collection=db.test
+
+	book=collection.find_one({'isbn':isbn})
+	return jsonify({'name':book['name'],'price':book['price'],'isbn':book['isbn']})
+
+	'''return_value={}
 	for book in books:
 		if book['isbn'] == isbn:
 			return_value={
 			'name':book['name'],
 			'price':book['price']
 			}
-	return return_value
+	return return_value'''
 
 @app.route('/books/<int:isbn>',methods=['PUT'])
 def replace_books(isbn):
 	request_data=request.get_json()
-	new_book={
-	'name':request_data['name'],
-	'price':request_data['price'],
-	'isbn':isbn
-	}
+	name1=request_data['name'],
+	price1=request_data['price'],
+	isbn1=isbn
+	try:
+		conn=MongoClient()
+	except:
+		print("could not connect")
+	db=conn.database
+	collection=db.test
+	
+	collection.update_one({"isbn":isbn},{"$set":{"name":name1,"price":price1,"isbn":isbn1}})
+
+	'''
 	i=0
 	for book in books:
 		current_isbn=book['isbn']
 		if current_isbn==isbn:
 			books[i]=new_book
 		i+=1
+	'''
 	response=Response("",204)
 	return response
 
@@ -142,6 +181,18 @@ def update_book(isbn):
 
 @app.route('/books/<int:isbn>',methods=['DELETE'])
 def delete_book(isbn):
+	try:
+		conn=MongoClient()
+	except:
+		print("could not connect")
+	db=conn.database
+	collection=db.test
+	cursor=collection.find()
+	collection.delete_one({'isbn':isbn})
+	response=Response("",204)
+	return response
+
+	'''
 	i=0
 	for book in books:
 		if book['isbn']==isbn:
@@ -149,5 +200,6 @@ def delete_book(isbn):
 			response=Response("",204)
 		i += 1
 	return response
+	'''
 
 app.run(port=5000)
