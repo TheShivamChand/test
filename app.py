@@ -1,7 +1,11 @@
-from  flask import Flask,jsonify,request,Response,json
+from  flask import Flask,jsonify,request,Response
+import json
+#from settings import *
+from pymongo import MongoClient
 
-app= Flask(__name__)
+app=Flask(__name__)
 
+'''
 books=[
 {
 	"name":"A",
@@ -20,6 +24,21 @@ books=[
 }
 ]
 
+try:
+	conn=MongoClient()
+	print("Connected Successfully")
+except:
+	print("Could not connect to database")
+db=conn.database
+
+collection=db.test
+
+for i in books:
+	collection.insert_one(i)
+	#print(i)
+'''
+
+
 def validBookObject(bookObject):
 	if ("name" in bookObject and "price" in bookObject and "isbn" in bookObject):
 		return True
@@ -32,10 +51,32 @@ def hello_world():
 
 @app.route('/books')
 def get_books():
-	return jsonify({'books':books})
+	try:
+		conn=MongoClient()
+		print("Connected Successfully")
+	except:
+		print("Could not connect to database")
+	db=conn.database
+	collection=db.test
+	cursor=collection.find().sort("isbn")
+
+	lists=[]
+
+	for record in cursor:
+		lists.append({'name':record['name'],'price':record['price'],'isbn':record['isbn']})
+
+	return jsonify({'result':lists})
 
 @app.route('/add_books',methods=['POST'])
 def add_books():
+	try:
+		conn=MongoClient()
+	except:
+		print("Could not connect")
+	db=conn.database
+	collection=db.test
+	cursor=collection.find()
+
 	res = request.get_json()
 	if(validBookObject(res)):
 		new_data={
@@ -43,14 +84,15 @@ def add_books():
 		"price":res['price'],
 		"isbn":res['isbn']
 		}
-		books.insert(len(books),new_data)
+		#books.insert(len(books),new_data)
+		collection.insert_one(new_data)
 		response=Response("",201,mimetype="application/json")
 		response.headers['Location'] = "/books/" + str(new_data['isbn'])
 		return response
 	else:
 		errorMsg={
 		"msg":"Error Message",
-		"solution": " Try to send data in proper method"
+		"solution": "Try to send data in proper method"
 		}
 		response=Response(json.dumps(errorMsg),400,mimetype='application/json')
 		return response
