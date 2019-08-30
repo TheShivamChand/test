@@ -1,9 +1,20 @@
 from pymongo import MongoClient
 from flask import jsonify
 
-db=MongoClient()
-db=db.judgement
-collection=db.tb_query_ratings
+client=MongoClient()
+db=db.examples
 
-for i in collection.find():
-	print(i)
+def user_mentions():
+	result=db.tweets.aggregate([a
+		{ "$unwind":"entitites.user_mentions"},
+		{"$group":{"$_id":"user.screen_name",
+		"count":{"$sum":1}}},
+		{"$sort":{"$count":-1}},
+		{"$limit":1}
+		])
+
+	return result
+
+if __name__=='__main__':
+	result=user_mentions()
+	print(result)
