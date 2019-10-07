@@ -26,7 +26,7 @@ dateadd_args = {
     "value": fields.Date(required=False),
     "addend": fields.Int(required=True, validate=validate.Range(min=1)),
     "unit": fields.Str(missing="days", validate=validate.OneOf(["minutes", "days"])),
-}s
+}
 
 
 @app.route("/dateadd", methods=["POST"])
